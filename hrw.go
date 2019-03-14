@@ -82,33 +82,38 @@ func SortSliceByValue(slice interface{}, hash uint64) {
 		return
 	}
 
-	switch slice := slice.(type) {
-	case []int:
+	switch val.Index(0).Interface().(type) {
+	case int:
 		var key = make([]byte, 16)
+		slice := slice.([]int)
+
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint64(key, uint64(slice[i]))
 			rule = append(rule, weight(Hash(key), hash))
 		}
-	case []int32:
+	case int32:
 		var key = make([]byte, 16)
+		slice := slice.([]int32)
+
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint32(key, uint32(slice[i]))
 			rule = append(rule, weight(Hash(key), hash))
 		}
-	case []string:
+	case string:
+		slice := slice.([]string)
+
 		for i := 0; i < length; i++ {
 			rule = append(rule, weight(hash,
 				Hash([]byte(slice[i]))))
 		}
-	default:
-		if _, ok := val.Index(0).Interface().(Hasher); !ok {
-			return
-		}
-
+	case Hasher:
 		for i := 0; i < length; i++ {
 			h := val.Index(i).Interface().(Hasher)
 			rule = append(rule, weight(hash, h.Hash()))
 		}
+
+	default:
+		return
 	}
 
 	rule = SortByWeight(rule, hash)
