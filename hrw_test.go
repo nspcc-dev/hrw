@@ -9,7 +9,14 @@ import (
 	"testing"
 )
 
-type hashString string
+type (
+	hashString string
+	unknown    byte
+	slices     struct {
+		actual interface{}
+		expect interface{}
+	}
+)
 
 var testKey = []byte("0xff51afd7ed558ccd")
 
@@ -44,6 +51,7 @@ func Example() {
 	// trying GET six.example.com/examples/object-key
 	// trying GET five.example.com/examples/object-key
 }
+
 func (h hashString) Hash() uint64 {
 	return Hash([]byte(h))
 }
@@ -118,8 +126,8 @@ func TestSortSliceByValueFail(t *testing.T) {
 	})
 
 	t.Run("must 'fail' for unknown type", func(t *testing.T) {
-		actual := []byte{1, 2, 3, 4, 5}
-		expect := []byte{1, 2, 3, 4, 5}
+		actual := []unknown{1, 2, 3, 4, 5}
+		expect := []unknown{1, 2, 3, 4, 5}
 		hash := Hash(testKey)
 		SortSliceByValue(actual, hash)
 		if !reflect.DeepEqual(actual, expect) {
@@ -139,12 +147,64 @@ func TestSortSliceByValueHasher(t *testing.T) {
 }
 
 func TestSortSliceByValueIntSlice(t *testing.T) {
-	actual := []int{0, 1, 2, 3, 4, 5}
-	expect := []int{2, 3, 1, 4, 0, 5}
+	cases := []slices{
+		{
+			actual: []int{0, 1, 2, 3, 4, 5},
+			expect: []int{2, 3, 1, 4, 0, 5},
+		},
+
+		{
+			actual: []uint{0, 1, 2, 3, 4, 5},
+			expect: []uint{2, 3, 1, 4, 0, 5},
+		},
+
+		{
+			actual: []int8{0, 1, 2, 3, 4, 5},
+			expect: []int8{2, 0, 5, 1, 4, 3},
+		},
+
+		{
+			actual: []uint8{0, 1, 2, 3, 4, 5},
+			expect: []uint8{2, 0, 5, 1, 4, 3},
+		},
+
+		{
+			actual: []int16{0, 1, 2, 3, 4, 5},
+			expect: []int16{5, 4, 0, 3, 2, 1},
+		},
+
+		{
+			actual: []uint16{0, 1, 2, 3, 4, 5},
+			expect: []uint16{5, 4, 0, 3, 2, 1},
+		},
+
+		{
+			actual: []int32{0, 1, 2, 3, 4, 5},
+			expect: []int32{1, 3, 5, 4, 2, 0},
+		},
+
+		{
+			actual: []uint32{0, 1, 2, 3, 4, 5},
+			expect: []uint32{1, 3, 5, 4, 2, 0},
+		},
+
+		{
+			actual: []int64{0, 1, 2, 3, 4, 5},
+			expect: []int64{1, 5, 3, 4, 2, 0},
+		},
+
+		{
+			actual: []uint64{0, 1, 2, 3, 4, 5},
+			expect: []uint64{1, 5, 3, 4, 2, 0},
+		},
+	}
 	hash := Hash(testKey)
-	SortSliceByValue(actual, hash)
-	if !reflect.DeepEqual(actual, expect) {
-		t.Errorf("Was %#v, but expected %#v", actual, expect)
+
+	for _, tc := range cases {
+		SortSliceByValue(tc.actual, hash)
+		if !reflect.DeepEqual(tc.actual, tc.expect) {
+			t.Errorf("Was %#v, but expected %#v", tc.actual, tc.expect)
+		}
 	}
 }
 
@@ -326,7 +386,6 @@ func TestUniformDistribution(t *testing.T) {
 				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
 				chi2, chiTable[size-1])
 		}
-
 	})
 
 	t.Run("sortByInt32Value", func(t *testing.T) {
@@ -367,7 +426,6 @@ func TestUniformDistribution(t *testing.T) {
 				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
 				chi2, chiTable[size-1])
 		}
-
 	})
 
 	t.Run("hash collision", func(t *testing.T) {

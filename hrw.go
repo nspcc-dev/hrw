@@ -86,22 +86,73 @@ func SortSliceByValue(slice interface{}, hash uint64) {
 	case int:
 		var key = make([]byte, 16)
 		slice := slice.([]int)
-
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint64(key, uint64(slice[i]))
+			rule = append(rule, weight(Hash(key), hash))
+		}
+	case uint:
+		var key = make([]byte, 16)
+		slice := slice.([]uint)
+		for i := 0; i < length; i++ {
+			binary.BigEndian.PutUint64(key, uint64(slice[i]))
+			rule = append(rule, weight(Hash(key), hash))
+		}
+	case int8:
+		slice := slice.([]int8)
+		for i := 0; i < length; i++ {
+			key := byte(slice[i])
+			rule = append(rule, weight(Hash([]byte{key}), hash))
+		}
+	case uint8:
+		slice := slice.([]uint8)
+		for i := 0; i < length; i++ {
+			key := slice[i]
+			rule = append(rule, weight(Hash([]byte{key}), hash))
+		}
+	case int16:
+		var key = make([]byte, 8)
+		slice := slice.([]int16)
+		for i := 0; i < length; i++ {
+			binary.BigEndian.PutUint16(key, uint16(slice[i]))
+			rule = append(rule, weight(Hash(key), hash))
+		}
+	case uint16:
+		var key = make([]byte, 8)
+		slice := slice.([]uint16)
+		for i := 0; i < length; i++ {
+			binary.BigEndian.PutUint16(key, slice[i])
 			rule = append(rule, weight(Hash(key), hash))
 		}
 	case int32:
 		var key = make([]byte, 16)
 		slice := slice.([]int32)
-
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint32(key, uint32(slice[i]))
 			rule = append(rule, weight(Hash(key), hash))
 		}
+	case uint32:
+		var key = make([]byte, 16)
+		slice := slice.([]uint32)
+		for i := 0; i < length; i++ {
+			binary.BigEndian.PutUint32(key, slice[i])
+			rule = append(rule, weight(Hash(key), hash))
+		}
+	case int64:
+		var key = make([]byte, 32)
+		slice := slice.([]int64)
+		for i := 0; i < length; i++ {
+			binary.BigEndian.PutUint64(key, uint64(slice[i]))
+			rule = append(rule, weight(Hash(key), hash))
+		}
+	case uint64:
+		var key = make([]byte, 32)
+		slice := slice.([]uint64)
+		for i := 0; i < length; i++ {
+			binary.BigEndian.PutUint64(key, slice[i])
+			rule = append(rule, weight(Hash(key), hash))
+		}
 	case string:
 		slice := slice.([]string)
-
 		for i := 0; i < length; i++ {
 			rule = append(rule, weight(hash,
 				Hash([]byte(slice[i]))))
