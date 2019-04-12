@@ -16,9 +16,15 @@ type (
 		actual interface{}
 		expect interface{}
 	}
+
+	Uint32Slice []uint32
 )
 
 var testKey = []byte("0xff51afd7ed558ccd")
+
+func (p Uint32Slice) Len() int           { return len(p) }
+func (p Uint32Slice) Less(i, j int) bool { return p[i] < p[j] }
+func (p Uint32Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 func Example() {
 	// given a set of servers
@@ -186,6 +192,11 @@ func TestSortSliceByValueIntSlice(t *testing.T) {
 		{
 			actual: []uint32{0, 1, 2, 3, 4, 5},
 			expect: []uint32{1, 3, 5, 4, 2, 0},
+		},
+
+		{
+			actual: Uint32Slice{0, 1, 2, 3, 4, 5},
+			expect: Uint32Slice{0, 1, 2, 3, 4, 5},
 		},
 
 		{

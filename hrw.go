@@ -82,89 +82,80 @@ func SortSliceByValue(slice interface{}, hash uint64) {
 		return
 	}
 
-	switch val.Index(0).Interface().(type) {
-	case int:
+	switch slice := slice.(type) {
+	case []int:
 		var key = make([]byte, 16)
-		slice := slice.([]int)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint64(key, uint64(slice[i]))
 			rule = append(rule, weight(Hash(key), hash))
 		}
-	case uint:
+	case []uint:
 		var key = make([]byte, 16)
-		slice := slice.([]uint)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint64(key, uint64(slice[i]))
 			rule = append(rule, weight(Hash(key), hash))
 		}
-	case int8:
-		slice := slice.([]int8)
+	case []int8:
 		for i := 0; i < length; i++ {
 			key := byte(slice[i])
 			rule = append(rule, weight(Hash([]byte{key}), hash))
 		}
-	case uint8:
-		slice := slice.([]uint8)
+	case []uint8:
 		for i := 0; i < length; i++ {
 			key := slice[i]
 			rule = append(rule, weight(Hash([]byte{key}), hash))
 		}
-	case int16:
+	case []int16:
 		var key = make([]byte, 8)
-		slice := slice.([]int16)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint16(key, uint16(slice[i]))
 			rule = append(rule, weight(Hash(key), hash))
 		}
-	case uint16:
+	case []uint16:
 		var key = make([]byte, 8)
-		slice := slice.([]uint16)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint16(key, slice[i])
 			rule = append(rule, weight(Hash(key), hash))
 		}
-	case int32:
+	case []int32:
 		var key = make([]byte, 16)
-		slice := slice.([]int32)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint32(key, uint32(slice[i]))
 			rule = append(rule, weight(Hash(key), hash))
 		}
-	case uint32:
+	case []uint32:
 		var key = make([]byte, 16)
-		slice := slice.([]uint32)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint32(key, slice[i])
 			rule = append(rule, weight(Hash(key), hash))
 		}
-	case int64:
+	case []int64:
 		var key = make([]byte, 32)
-		slice := slice.([]int64)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint64(key, uint64(slice[i]))
 			rule = append(rule, weight(Hash(key), hash))
 		}
-	case uint64:
+	case []uint64:
 		var key = make([]byte, 32)
-		slice := slice.([]uint64)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint64(key, slice[i])
 			rule = append(rule, weight(Hash(key), hash))
 		}
-	case string:
-		slice := slice.([]string)
+	case []string:
 		for i := 0; i < length; i++ {
 			rule = append(rule, weight(hash,
 				Hash([]byte(slice[i]))))
 		}
-	case Hasher:
+
+	default:
+		if _, ok := val.Index(0).Interface().(Hasher); !ok {
+			return
+		}
+
 		for i := 0; i < length; i++ {
 			h := val.Index(i).Interface().(Hasher)
 			rule = append(rule, weight(hash, h.Hash()))
 		}
-
-	default:
-		return
 	}
 
 	rule = SortByWeight(rule, hash)
