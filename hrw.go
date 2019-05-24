@@ -24,7 +24,7 @@ type (
 
 	weighted struct {
 		h      hashed
-		normal []float64
+		normal []float64 // normalized input weights
 	}
 )
 
@@ -49,6 +49,8 @@ func (h hashed) Swap(i, j int) {
 
 func (w weighted) Len() int { return w.h.length }
 func (w weighted) Less(i, j int) bool {
+	// `maxUint64 - weight` makes least weight most valuable
+	// it is necessary for operation with normalized values
 	wi := float64(^uint64(0)-w.h.weight[i]) * w.normal[i]
 	wj := float64(^uint64(0)-w.h.weight[j]) * w.normal[j]
 	return wi > wj // higher weight must be placed lower to be first
@@ -83,6 +85,8 @@ func Sort(nodes []uint64, hash uint64) []uint64 {
 // SortByWeight receive nodes and hash, and sort it by weight
 func SortByWeight(nodes []uint64, weights []uint64, hash uint64) []uint64 {
 	var (
+		maxWeight uint64
+
 		l = len(nodes)
 		w = weighted{
 			h: hashed{
@@ -92,17 +96,16 @@ func SortByWeight(nodes []uint64, weights []uint64, hash uint64) []uint64 {
 			},
 			normal: make([]float64, 0, l),
 		}
-		maxWeight uint64
 	)
 
-	// weights are uint32 type so it more likely will not cause overflow
+	// finding max weight to perform normalization
 	for i := range weights {
 		if maxWeight < weights[i] {
 			maxWeight = weights[i]
 		}
 	}
 
-	// if all nodes have no weights then it is simple sorting or incorrect weights length
+	// if all nodes have 0-weights or weights are incorrect then sort uniformly
 	if maxWeight == 0 || l != len(nodes) {
 		return Sort(nodes, hash)
 	}
