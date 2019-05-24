@@ -50,12 +50,12 @@ func Example() {
 	}
 
 	// Output:
-	// trying GET four.example.com/examples/object-key
 	// trying GET three.example.com/examples/object-key
-	// trying GET one.example.com/examples/object-key
 	// trying GET two.example.com/examples/object-key
-	// trying GET six.example.com/examples/object-key
 	// trying GET five.example.com/examples/object-key
+	// trying GET six.example.com/examples/object-key
+	// trying GET one.example.com/examples/object-key
+	// trying GET four.example.com/examples/object-key
 }
 
 func (h hashString) Hash() uint64 {
@@ -74,7 +74,7 @@ func TestSortSliceByIndex(t *testing.T) {
 
 func TestSortSliceByValue(t *testing.T) {
 	actual := []string{"a", "b", "c", "d", "e", "f"}
-	expect := []string{"d", "b", "a", "f", "c", "e"}
+	expect := []string{"d", "f", "c", "b", "a", "e"}
 	hash := Hash(testKey)
 	SortSliceByValue(actual, hash)
 	if !reflect.DeepEqual(actual, expect) {
@@ -144,7 +144,7 @@ func TestSortSliceByValueFail(t *testing.T) {
 
 func TestSortSliceByValueHasher(t *testing.T) {
 	actual := []hashString{"a", "b", "c", "d", "e", "f"}
-	expect := []hashString{"d", "b", "a", "f", "c", "e"}
+	expect := []hashString{"d", "f", "c", "b", "a", "e"}
 	hash := Hash(testKey)
 	SortSliceByValue(actual, hash)
 	if !reflect.DeepEqual(actual, expect) {
@@ -156,42 +156,42 @@ func TestSortSliceByValueIntSlice(t *testing.T) {
 	cases := []slices{
 		{
 			actual: []int{0, 1, 2, 3, 4, 5},
-			expect: []int{2, 3, 1, 4, 0, 5},
+			expect: []int{2, 0, 5, 3, 1, 4},
 		},
 
 		{
 			actual: []uint{0, 1, 2, 3, 4, 5},
-			expect: []uint{2, 3, 1, 4, 0, 5},
+			expect: []uint{2, 0, 5, 3, 1, 4},
 		},
 
 		{
 			actual: []int8{0, 1, 2, 3, 4, 5},
-			expect: []int8{2, 0, 5, 1, 4, 3},
+			expect: []int8{5, 2, 1, 4, 0, 3},
 		},
 
 		{
 			actual: []uint8{0, 1, 2, 3, 4, 5},
-			expect: []uint8{2, 0, 5, 1, 4, 3},
+			expect: []uint8{5, 2, 1, 4, 0, 3},
 		},
 
 		{
 			actual: []int16{0, 1, 2, 3, 4, 5},
-			expect: []int16{5, 4, 0, 3, 2, 1},
+			expect: []int16{1, 0, 3, 2, 4, 5},
 		},
 
 		{
 			actual: []uint16{0, 1, 2, 3, 4, 5},
-			expect: []uint16{5, 4, 0, 3, 2, 1},
+			expect: []uint16{1, 0, 3, 2, 4, 5},
 		},
 
 		{
 			actual: []int32{0, 1, 2, 3, 4, 5},
-			expect: []int32{1, 3, 5, 4, 2, 0},
+			expect: []int32{5, 1, 2, 0, 3, 4},
 		},
 
 		{
 			actual: []uint32{0, 1, 2, 3, 4, 5},
-			expect: []uint32{1, 3, 5, 4, 2, 0},
+			expect: []uint32{5, 1, 2, 0, 3, 4},
 		},
 
 		{
@@ -201,12 +201,12 @@ func TestSortSliceByValueIntSlice(t *testing.T) {
 
 		{
 			actual: []int64{0, 1, 2, 3, 4, 5},
-			expect: []int64{1, 5, 3, 4, 2, 0},
+			expect: []int64{5, 3, 0, 1, 4, 2},
 		},
 
 		{
 			actual: []uint64{0, 1, 2, 3, 4, 5},
-			expect: []uint64{1, 5, 3, 4, 2, 0},
+			expect: []uint64{5, 3, 0, 1, 4, 2},
 		},
 	}
 	hash := Hash(testKey)
@@ -253,7 +253,7 @@ func TestUniformDistribution(t *testing.T) {
 		}
 
 		for i = 0; i < keys; i++ {
-			binary.BigEndian.PutUint64(key, i)
+			binary.BigEndian.PutUint64(key, i+size)
 			hash := Hash(key)
 			counts[SortByWeight(nodes[:], hash)[0]]++
 		}
@@ -293,7 +293,7 @@ func TestUniformDistribution(t *testing.T) {
 		for i = 0; i < keys; i++ {
 			copy(b[:], a[:])
 
-			binary.BigEndian.PutUint64(key, i)
+			binary.BigEndian.PutUint64(key, i+size)
 			hash := Hash(key)
 			SortSliceByIndex(b[:], hash)
 			counts[b[0]]++
@@ -333,7 +333,7 @@ func TestUniformDistribution(t *testing.T) {
 
 		for i = 0; i < keys; i++ {
 			copy(b[:], a[:])
-			binary.BigEndian.PutUint64(key, i)
+			binary.BigEndian.PutUint64(key, i+size)
 			hash := Hash(key)
 			SortSliceByValue(b[:], hash)
 			counts[b[0]]++
@@ -373,7 +373,7 @@ func TestUniformDistribution(t *testing.T) {
 
 		for i = 0; i < keys; i++ {
 			copy(b[:], a[:])
-			binary.BigEndian.PutUint64(key, i)
+			binary.BigEndian.PutUint64(key, i+size)
 			hash := Hash(key)
 			SortSliceByValue(b[:], hash)
 			counts[b[0]]++
@@ -413,7 +413,7 @@ func TestUniformDistribution(t *testing.T) {
 
 		for i = 0; i < keys; i++ {
 			copy(b[:], a[:])
-			binary.BigEndian.PutUint64(key, i)
+			binary.BigEndian.PutUint64(key, i+size)
 			hash := Hash(key)
 			SortSliceByValue(b[:], hash)
 			counts[b[0]]++
@@ -447,7 +447,7 @@ func TestUniformDistribution(t *testing.T) {
 		)
 
 		for i = 0; i < keys; i++ {
-			binary.BigEndian.PutUint64(key, i)
+			binary.BigEndian.PutUint64(key, i+size)
 			hash := Hash(key)
 			counts[hash]++
 		}

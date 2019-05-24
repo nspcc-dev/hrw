@@ -87,64 +87,63 @@ func SortSliceByValue(slice interface{}, hash uint64) {
 		var key = make([]byte, 16)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint64(key, uint64(slice[i]))
-			rule = append(rule, weight(Hash(key), hash))
+			rule = append(rule, Hash(key))
 		}
 	case []uint:
 		var key = make([]byte, 16)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint64(key, uint64(slice[i]))
-			rule = append(rule, weight(Hash(key), hash))
+			rule = append(rule, Hash(key))
 		}
 	case []int8:
 		for i := 0; i < length; i++ {
 			key := byte(slice[i])
-			rule = append(rule, weight(Hash([]byte{key}), hash))
+			rule = append(rule, Hash([]byte{key}))
 		}
 	case []uint8:
 		for i := 0; i < length; i++ {
 			key := slice[i]
-			rule = append(rule, weight(Hash([]byte{key}), hash))
+			rule = append(rule, Hash([]byte{key}))
 		}
 	case []int16:
 		var key = make([]byte, 8)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint16(key, uint16(slice[i]))
-			rule = append(rule, weight(Hash(key), hash))
+			rule = append(rule, Hash(key))
 		}
 	case []uint16:
 		var key = make([]byte, 8)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint16(key, slice[i])
-			rule = append(rule, weight(Hash(key), hash))
+			rule = append(rule, Hash(key))
 		}
 	case []int32:
 		var key = make([]byte, 16)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint32(key, uint32(slice[i]))
-			rule = append(rule, weight(Hash(key), hash))
+			rule = append(rule, Hash(key))
 		}
 	case []uint32:
 		var key = make([]byte, 16)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint32(key, slice[i])
-			rule = append(rule, weight(Hash(key), hash))
+			rule = append(rule, Hash(key))
 		}
 	case []int64:
 		var key = make([]byte, 32)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint64(key, uint64(slice[i]))
-			rule = append(rule, weight(Hash(key), hash))
+			rule = append(rule, Hash(key))
 		}
 	case []uint64:
 		var key = make([]byte, 32)
 		for i := 0; i < length; i++ {
 			binary.BigEndian.PutUint64(key, slice[i])
-			rule = append(rule, weight(Hash(key), hash))
+			rule = append(rule, Hash(key))
 		}
 	case []string:
 		for i := 0; i < length; i++ {
-			rule = append(rule, weight(hash,
-				Hash([]byte(slice[i]))))
+			rule = append(rule, Hash([]byte(slice[i])))
 		}
 
 	default:
@@ -154,7 +153,7 @@ func SortSliceByValue(slice interface{}, hash uint64) {
 
 		for i := 0; i < length; i++ {
 			h := val.Index(i).Interface().(Hasher)
-			rule = append(rule, weight(hash, h.Hash()))
+			rule = append(rule, h.Hash())
 		}
 	}
 
