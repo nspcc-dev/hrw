@@ -21,6 +21,11 @@ type (
 		sorted []uint64
 		weight []uint64
 	}
+
+	weighted struct {
+		h      hashed
+		normal []float64
+	}
 )
 
 func weight(x uint64, y uint64) uint64 {
@@ -36,16 +41,27 @@ func weight(x uint64, y uint64) uint64 {
 }
 
 func (h hashed) Len() int           { return h.length }
-func (h hashed) Less(i, j int) bool { return h.weight[h.sorted[i]] < h.weight[h.sorted[j]] }
-func (h hashed) Swap(i, j int)      { h.sorted[i], h.sorted[j] = h.sorted[j], h.sorted[i] }
+func (h hashed) Less(i, j int) bool { return h.weight[i] < h.weight[j] }
+func (h hashed) Swap(i, j int) {
+	h.sorted[i], h.sorted[j] = h.sorted[j], h.sorted[i]
+	h.weight[i], h.weight[j] = h.weight[j], h.weight[i]
+}
+
+func (w weighted) Len() int { return w.h.length }
+func (w weighted) Less(i, j int) bool {
+	wi := float64(^uint64(0)-w.h.weight[i]) * w.normal[i]
+	wj := float64(^uint64(0)-w.h.weight[j]) * w.normal[j]
+	return wi > wj // higher weight must be placed lower to be first
+}
+func (w weighted) Swap(i, j int) { w.normal[i], w.normal[j] = w.normal[j], w.normal[i]; w.h.Swap(i, j) }
 
 // Hash uses murmur3 hash to return uint64
 func Hash(key []byte) uint64 {
 	return murmur3.Sum64(key)
 }
 
-// SortByWeight receive nodes and hash, and sort it by weight
-func SortByWeight(nodes []uint64, hash uint64) []uint64 {
+// Sort receive nodes and hash, and sort it by weight
+func Sort(nodes []uint64, hash uint64) []uint64 {
 	var (
 		l = len(nodes)
 		h = hashed{
@@ -64,22 +80,128 @@ func SortByWeight(nodes []uint64, hash uint64) []uint64 {
 	return h.sorted
 }
 
+// SortByWeight receive nodes and hash, and sort it by weight
+func SortByWeight(nodes []uint64, weights []uint64, hash uint64) []uint64 {
+	var (
+		l = len(nodes)
+		w = weighted{
+			h: hashed{
+				length: l,
+				sorted: make([]uint64, 0, l),
+				weight: make([]uint64, 0, l),
+			},
+			normal: make([]float64, 0, l),
+		}
+		maxWeight uint64
+	)
+
+	// weights are uint32 type so it more likely will not cause overflow
+	for i := range weights {
+		if maxWeight < weights[i] {
+			maxWeight = weights[i]
+		}
+	}
+
+	// if all nodes have no weights then it is simple sorting or incorrect weights length
+	if maxWeight == 0 || l != len(nodes) {
+		return Sort(nodes, hash)
+	}
+
+	fMaxWeight := float64(maxWeight)
+	for i, node := range nodes {
+		w.h.sorted = append(w.h.sorted, uint64(i))
+		w.h.weight = append(w.h.weight, weight(node, hash))
+		w.normal = append(w.normal, float64(weights[i])/fMaxWeight)
+	}
+	sort.Sort(w)
+	return w.h.sorted
+}
+
 // SortSliceByValue received []T and hash to sort by value-weight
 func SortSliceByValue(slice interface{}, hash uint64) {
+	rule := prepareRule(slice)
+	if rule != nil {
+		swap := reflect.Swapper(slice)
+		rule = Sort(rule, hash)
+		sortByRuleInverse(swap, uint64(len(rule)), rule)
+	}
+}
+
+// SortSliceByWeightValue received []T, weights and hash to sort by value-weight
+func SortSliceByWeightValue(slice interface{}, weight []uint64, hash uint64) {
+	rule := prepareRule(slice)
+	if rule != nil {
+		swap := reflect.Swapper(slice)
+		rule = SortByWeight(rule, weight, hash)
+		sortByRuleInverse(swap, uint64(len(rule)), rule)
+	}
+}
+
+// SortSliceByIndex received []T and hash to sort by index-weight
+func SortSliceByIndex(slice interface{}, hash uint64) {
+	length := uint64(reflect.ValueOf(slice).Len())
+	swap := reflect.Swapper(slice)
+	rule := make([]uint64, 0, length)
+	for i := uint64(0); i < length; i++ {
+		rule = append(rule, i)
+	}
+	rule = Sort(rule, hash)
+	sortByRuleInverse(swap, length, rule)
+}
+
+// SortSliceByWeightIndex received []T, weights and hash to sort by index-weight
+func SortSliceByWeightIndex(slice interface{}, weight []uint64, hash uint64) {
+	length := uint64(reflect.ValueOf(slice).Len())
+	swap := reflect.Swapper(slice)
+	rule := make([]uint64, 0, length)
+	for i := uint64(0); i < length; i++ {
+		rule = append(rule, i)
+	}
+	rule = SortByWeight(rule, weight, hash)
+	sortByRuleInverse(swap, length, rule)
+}
+
+func sortByRuleDirect(swap swapper, length uint64, rule []uint64) {
+	done := make([]bool, length)
+	for i := uint64(0); i < length; i++ {
+		if done[i] {
+			continue
+		}
+		for j := rule[i]; !done[rule[j]]; j = rule[j] {
+			swap(int(i), int(j))
+			done[j] = true
+		}
+	}
+}
+
+func sortByRuleInverse(swap swapper, length uint64, rule []uint64) {
+	done := make([]bool, length)
+	for i := uint64(0); i < length; i++ {
+		if done[i] {
+			continue
+		}
+
+		for j := i; !done[rule[j]]; j = rule[j] {
+			swap(int(j), int(rule[j]))
+			done[j] = true
+		}
+	}
+}
+
+func prepareRule(slice interface{}) []uint64 {
 	t := reflect.TypeOf(slice)
 	if t.Kind() != reflect.Slice {
-		return
+		return nil
 	}
 
 	var (
 		val    = reflect.ValueOf(slice)
-		swap   = reflect.Swapper(slice)
 		length = val.Len()
 		rule   = make([]uint64, 0, length)
 	)
 
 	if length == 0 {
-		return
+		return nil
 	}
 
 	switch slice := slice.(type) {
@@ -148,7 +270,7 @@ func SortSliceByValue(slice interface{}, hash uint64) {
 
 	default:
 		if _, ok := val.Index(0).Interface().(Hasher); !ok {
-			return
+			return nil
 		}
 
 		for i := 0; i < length; i++ {
@@ -156,46 +278,5 @@ func SortSliceByValue(slice interface{}, hash uint64) {
 			rule = append(rule, h.Hash())
 		}
 	}
-
-	rule = SortByWeight(rule, hash)
-	sortByRuleInverse(swap, uint64(length), rule)
-}
-
-// SortSliceByIndex received []T and hash to sort by index-weight
-func SortSliceByIndex(slice interface{}, hash uint64) {
-	length := uint64(reflect.ValueOf(slice).Len())
-	swap := reflect.Swapper(slice)
-	rule := make([]uint64, 0, length)
-	for i := uint64(0); i < length; i++ {
-		rule = append(rule, i)
-	}
-	rule = SortByWeight(rule, hash)
-	sortByRuleInverse(swap, length, rule)
-}
-
-func sortByRuleDirect(swap swapper, length uint64, rule []uint64) {
-	done := make([]bool, length)
-	for i := uint64(0); i < length; i++ {
-		if done[i] {
-			continue
-		}
-		for j := rule[i]; !done[rule[j]]; j = rule[j] {
-			swap(int(i), int(j))
-			done[j] = true
-		}
-	}
-}
-
-func sortByRuleInverse(swap swapper, length uint64, rule []uint64) {
-	done := make([]bool, length)
-	for i := uint64(0); i < length; i++ {
-		if done[i] {
-			continue
-		}
-
-		for j := i; !done[rule[j]]; j = rule[j] {
-			swap(int(j), int(rule[j]))
-			done[j] = true
-		}
-	}
+	return rule
 }
