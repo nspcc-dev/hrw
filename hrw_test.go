@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"testing"
@@ -67,6 +68,17 @@ func TestSortSliceByIndex(t *testing.T) {
 	expect := []string{"e", "a", "c", "f", "d", "b"}
 	hash := Hash(testKey)
 	SortSliceByIndex(actual, hash)
+	if !reflect.DeepEqual(actual, expect) {
+		t.Errorf("Was %#v, but expected %#v", actual, expect)
+	}
+}
+
+func TestSortSliceByWeightIndex(t *testing.T) {
+	actual := []string{"a", "b", "c", "d", "e", "f"}
+	weights := []uint64{10, 10, 10, 2, 2, 2}
+	expect := []string{"a", "c", "b", "e", "f", "d"}
+	hash := Hash(testKey)
+	SortSliceByWeightIndex(actual, weights, hash)
 	if !reflect.DeepEqual(actual, expect) {
 		t.Errorf("Was %#v, but expected %#v", actual, expect)
 	}
@@ -219,17 +231,17 @@ func TestSortSliceByValueIntSlice(t *testing.T) {
 	}
 }
 
-func TestSortByWeight(t *testing.T) {
+func TestSort(t *testing.T) {
 	nodes := []uint64{1, 2, 3, 4, 5}
 	hash := Hash(testKey)
-	actual := SortByWeight(nodes, hash)
+	actual := Sort(nodes, hash)
 	expected := []uint64{3, 1, 4, 2, 0}
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("Was %#v, but expected %#v", actual, expected)
 	}
 }
 
-func TestUniformDistribution(t *testing.T) {
+func TestDistribution(t *testing.T) {
 	const (
 		size    = 10
 		keys    = 100000
@@ -240,7 +252,7 @@ func TestUniformDistribution(t *testing.T) {
 	// https://www.medcalc.org/manual/chi-square-table.php p=0.1
 	var chiTable = map[int]float64{9: 14.68, 99: 117.407}
 
-	t.Run("sortByWeight", func(t *testing.T) {
+	t.Run("sort", func(t *testing.T) {
 		var (
 			i      uint64
 			nodes  [size]uint64
@@ -255,7 +267,7 @@ func TestUniformDistribution(t *testing.T) {
 		for i = 0; i < keys; i++ {
 			binary.BigEndian.PutUint64(key, i+size)
 			hash := Hash(key)
-			counts[SortByWeight(nodes[:], hash)[0]]++
+			counts[Sort(nodes[:], hash)[0]]++
 		}
 
 		var chi2 float64
@@ -439,6 +451,170 @@ func TestUniformDistribution(t *testing.T) {
 		}
 	})
 
+	t.Run("sortByWeightValue", func(t *testing.T) {
+		var (
+			i            uint64
+			a, b, result [size]int
+			w            [size]uint64
+			key          = make([]byte, 16)
+		)
+
+		for i = 0; i < size; i++ {
+			a[i] = int(i)
+			w[i] = size - i
+		}
+		for i = 0; i < keys; i++ {
+			copy(b[:], a[:])
+			binary.BigEndian.PutUint64(key, i+size)
+			hash := Hash(key)
+			SortSliceByWeightValue(b[:], w[:], hash)
+			result[b[0]]++
+		}
+		for i := 0; i < size-1; i++ {
+			if bool(w[i] > w[i+1]) != bool(result[i] > result[i+1]) {
+				t.Fatalf("result array %v must be corresponded to weights %v", result, w)
+			}
+		}
+	})
+
+	t.Run("sortByWeightValueShuffledW", func(t *testing.T) {
+		var (
+			i            uint64
+			a, b, result [size]int
+			w            [size]uint64
+			key          = make([]byte, 16)
+		)
+
+		for i = 0; i < size; i++ {
+			a[i] = int(i)
+			w[i] = size - i
+		}
+
+		rand.Shuffle(size, func(i, j int) {
+			w[i], w[j] = w[j], w[i]
+		})
+		for i = 0; i < keys; i++ {
+			copy(b[:], a[:])
+			binary.BigEndian.PutUint64(key, i+size)
+			hash := Hash(key)
+			SortSliceByWeightValue(b[:], w[:], hash)
+			result[b[0]]++
+		}
+		for i := 0; i < size-1; i++ {
+			if bool(w[i] > w[i+1]) != bool(result[i] > result[i+1]) {
+				t.Fatalf("result array %v must be corresponded to weights %v", result, w)
+			}
+		}
+	})
+
+	t.Run("sortByWeightValueEmptyW", func(t *testing.T) {
+		var (
+			i      uint64
+			a, b   [size]int
+			w      [size]uint64
+			counts = make(map[int]int, size)
+			key    = make([]byte, 16)
+		)
+
+		for i = 0; i < size; i++ {
+			a[i] = int(i)
+		}
+
+		for i = 0; i < keys; i++ {
+			copy(b[:], a[:])
+			binary.BigEndian.PutUint64(key, i+size)
+			hash := Hash(key)
+			SortSliceByWeightValue(b[:], w[:], hash)
+			counts[b[0]]++
+		}
+
+		var chi2 float64
+		mean := float64(keys) / float64(size)
+		delta := mean * percent
+		for node, count := range counts {
+			d := mean - float64(count)
+			chi2 += math.Pow(float64(count)-mean, 2) / mean
+			if d > delta || (0-d) > delta {
+				t.Errorf(
+					"Node %d received %d keys, expected %.0f (+/- %.2f)",
+					node, count, mean, delta,
+				)
+			}
+		}
+		if chi2 > chiTable[size-1] {
+			t.Errorf(
+				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
+				chi2, chiTable[size-1])
+		}
+	})
+
+	t.Run("sortByWeightValueUniformW", func(t *testing.T) {
+		var (
+			i      uint64
+			a, b   [size]int
+			w      [size]uint64
+			counts = make(map[int]int, size)
+			key    = make([]byte, 16)
+		)
+
+		for i = 0; i < size; i++ {
+			a[i] = int(i)
+			w[i] = 10
+		}
+
+		for i = 0; i < keys; i++ {
+			copy(b[:], a[:])
+			binary.BigEndian.PutUint64(key, i+size)
+			hash := Hash(key)
+			SortSliceByWeightValue(b[:], w[:], hash)
+			counts[b[0]]++
+		}
+
+		var chi2 float64
+		mean := float64(keys) / float64(size)
+		delta := mean * percent
+		for node, count := range counts {
+			d := mean - float64(count)
+			chi2 += math.Pow(float64(count)-mean, 2) / mean
+			if d > delta || (0-d) > delta {
+				t.Errorf(
+					"Node %d received %d keys, expected %.0f (+/- %.2f)",
+					node, count, mean, delta,
+				)
+			}
+		}
+		if chi2 > chiTable[size-1] {
+			t.Errorf(
+				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
+				chi2, chiTable[size-1])
+		}
+	})
+
+	t.Run("sortByWeightValueAbsoluteW", func(t *testing.T) {
+		var (
+			i    uint64
+			a, b [size]int
+			w    [size]uint64
+			key  = make([]byte, 16)
+		)
+
+		for i = 0; i < size; i++ {
+			a[i] = int(i)
+		}
+		w[size-1] = 10
+
+		for i = 0; i < keys; i++ {
+			copy(b[:], a[:])
+			binary.BigEndian.PutUint64(key, i+size)
+			hash := Hash(key)
+			SortSliceByWeightValue(b[:], w[:], hash)
+			if b[0] != a[size-1] {
+				t.Fatalf("expected last value of %v to be the first with highest weight", a)
+			}
+		}
+
+	})
+
 	t.Run("hash collision", func(t *testing.T) {
 		var (
 			i      uint64
@@ -460,19 +636,19 @@ func TestUniformDistribution(t *testing.T) {
 	})
 }
 
-func BenchmarkSortByWeight_fnv_10(b *testing.B) {
+func BenchmarkSort_fnv_10(b *testing.B) {
 	hash := Hash(testKey)
-	_ = benchmarkSortByWeight(b, 10, hash)
+	_ = benchmarkSort(b, 10, hash)
 }
 
-func BenchmarkSortByWeight_fnv_100(b *testing.B) {
+func BenchmarkSort_fnv_100(b *testing.B) {
 	hash := Hash(testKey)
-	_ = benchmarkSortByWeight(b, 100, hash)
+	_ = benchmarkSort(b, 100, hash)
 }
 
-func BenchmarkSortByWeight_fnv_1000(b *testing.B) {
+func BenchmarkSort_fnv_1000(b *testing.B) {
 	hash := Hash(testKey)
-	_ = benchmarkSortByWeight(b, 1000, hash)
+	_ = benchmarkSort(b, 1000, hash)
 }
 
 func BenchmarkSortByIndex_fnv_10(b *testing.B) {
@@ -505,7 +681,52 @@ func BenchmarkSortByValue_fnv_1000(b *testing.B) {
 	benchmarkSortByValue(b, 1000, hash)
 }
 
-func benchmarkSortByWeight(b *testing.B, n int, hash uint64) uint64 {
+func BenchmarkSortByWeight_fnv_10(b *testing.B) {
+	hash := Hash(testKey)
+	_ = benchmarkSortByWeight(b, 10, hash)
+}
+
+func BenchmarkSortByWeight_fnv_100(b *testing.B) {
+	hash := Hash(testKey)
+	_ = benchmarkSortByWeight(b, 100, hash)
+}
+
+func BenchmarkSortByWeight_fnv_1000(b *testing.B) {
+	hash := Hash(testKey)
+	_ = benchmarkSortByWeight(b, 1000, hash)
+}
+
+func BenchmarkSortByWeightIndex_fnv_10(b *testing.B) {
+	hash := Hash(testKey)
+	benchmarkSortByWeightIndex(b, 10, hash)
+}
+
+func BenchmarkSortByWeightIndex_fnv_100(b *testing.B) {
+	hash := Hash(testKey)
+	benchmarkSortByWeightIndex(b, 100, hash)
+}
+
+func BenchmarkSortByWeightIndex_fnv_1000(b *testing.B) {
+	hash := Hash(testKey)
+	benchmarkSortByWeightIndex(b, 1000, hash)
+}
+
+func BenchmarkSortByWeightValue_fnv_10(b *testing.B) {
+	hash := Hash(testKey)
+	benchmarkSortByWeightValue(b, 10, hash)
+}
+
+func BenchmarkSortByWeightValue_fnv_100(b *testing.B) {
+	hash := Hash(testKey)
+	benchmarkSortByWeightValue(b, 100, hash)
+}
+
+func BenchmarkSortByWeightValue_fnv_1000(b *testing.B) {
+	hash := Hash(testKey)
+	benchmarkSortByWeightValue(b, 1000, hash)
+}
+
+func benchmarkSort(b *testing.B, n int, hash uint64) uint64 {
 	servers := make([]uint64, n)
 	for i := uint64(0); i < uint64(len(servers)); i++ {
 		servers[i] = i
@@ -516,7 +737,7 @@ func benchmarkSortByWeight(b *testing.B, n int, hash uint64) uint64 {
 
 	var x uint64
 	for i := 0; i < b.N; i++ {
-		x += SortByWeight(servers, hash)[0]
+		x += Sort(servers, hash)[0]
 	}
 	return x
 }
@@ -546,5 +767,55 @@ func benchmarkSortByValue(b *testing.B, n int, hash uint64) {
 
 	for i := 0; i < b.N; i++ {
 		SortSliceByValue(servers, hash)
+	}
+}
+
+func benchmarkSortByWeight(b *testing.B, n int, hash uint64) uint64 {
+	servers := make([]uint64, n)
+	weights := make([]uint64, n)
+	for i := uint64(0); i < uint64(len(servers)); i++ {
+		weights[i] = uint64(n) - i
+		servers[i] = i
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	var x uint64
+	for i := 0; i < b.N; i++ {
+		x += SortByWeight(servers, weights, hash)[0]
+	}
+	return x
+}
+
+func benchmarkSortByWeightIndex(b *testing.B, n int, hash uint64) {
+	servers := make([]uint64, n)
+	weights := make([]uint64, n)
+	for i := uint64(0); i < uint64(len(servers)); i++ {
+		weights[i] = uint64(n) - i
+		servers[i] = i
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		SortSliceByWeightIndex(servers, weights, hash)
+	}
+}
+
+func benchmarkSortByWeightValue(b *testing.B, n int, hash uint64) {
+	servers := make([]string, n)
+	weights := make([]uint64, n)
+	for i := uint64(0); i < uint64(len(servers)); i++ {
+		weights[i] = uint64(n) - i
+		servers[i] = "localhost:" + strconv.FormatUint(60000-i, 10)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		SortSliceByWeightValue(servers, weights, hash)
 	}
 }

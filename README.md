@@ -14,15 +14,26 @@
 ## Benchmark:
 
 ```
-BenchmarkSortByWeight_fnv_10-8     	 3000000	       435 ns/op	     224 B/op	       3 allocs/op
-BenchmarkSortByWeight_fnv_100-8    	  200000	      7238 ns/op	    1856 B/op	       3 allocs/op
-BenchmarkSortByWeight_fnv_1000-8   	   10000	    163158 ns/op	   16448 B/op	       3 allocs/op
-BenchmarkSortByIndex_fnv_10-8      	 2000000	       642 ns/op	     384 B/op	       7 allocs/op
-BenchmarkSortByIndex_fnv_100-8     	  200000	      8045 ns/op	    2928 B/op	       7 allocs/op
-BenchmarkSortByIndex_fnv_1000-8    	   10000	    227527 ns/op	   25728 B/op	       7 allocs/op
-BenchmarkSortByValue_fnv_10-8      	 1000000	      1244 ns/op	     544 B/op	      17 allocs/op
-BenchmarkSortByValue_fnv_100-8     	  100000	     12397 ns/op	    4528 B/op	     107 allocs/op
-BenchmarkSortByValue_fnv_1000-8    	   10000	    154278 ns/op	   41728 B/op	    1007 allocs/op
+BenchmarkSort_fnv_10-8                           5000000               354 ns/op             224 B/op          3 allocs/op
+BenchmarkSort_fnv_100-8                           300000              5103 ns/op            1856 B/op          3 allocs/op
+BenchmarkSort_fnv_1000-8                           10000            115874 ns/op           16448 B/op          3 allocs/op
+BenchmarkSortByIndex_fnv_10-8                    3000000               562 ns/op             384 B/op          7 allocs/op
+BenchmarkSortByIndex_fnv_100-8                    200000              5819 ns/op            2928 B/op          7 allocs/op
+BenchmarkSortByIndex_fnv_1000-8                    10000            125859 ns/op           25728 B/op          7 allocs/op
+BenchmarkSortByValue_fnv_10-8                    2000000              1056 ns/op             544 B/op         17 allocs/op
+BenchmarkSortByValue_fnv_100-8                    200000              9593 ns/op            4528 B/op        107 allocs/op
+BenchmarkSortByValue_fnv_1000-8                    10000            109272 ns/op           41728 B/op       1007 allocs/op
+
+BenchmarkSortByWeight_fnv_10-8                   3000000               500 ns/op             320 B/op          4 allocs/op
+BenchmarkSortByWeight_fnv_100-8                   200000              8257 ns/op            2768 B/op          4 allocs/op
+BenchmarkSortByWeight_fnv_1000-8                   10000            197938 ns/op           24656 B/op          4 allocs/op
+BenchmarkSortByWeightIndex_fnv_10-8              2000000               760 ns/op             480 B/op          8 allocs/op
+BenchmarkSortByWeightIndex_fnv_100-8              200000              9191 ns/op            3840 B/op          8 allocs/op
+BenchmarkSortByWeightIndex_fnv_1000-8              10000            208204 ns/op           33936 B/op          8 allocs/op
+BenchmarkSortByWeightValue_fnv_10-8              1000000              1095 ns/op             640 B/op         18 allocs/op
+BenchmarkSortByWeightValue_fnv_100-8              200000             12291 ns/op            5440 B/op        108 allocs/op
+BenchmarkSortByWeightValue_fnv_1000-8              10000            145125 ns/op           49936 B/op       1008 allocs/op
+
 ```
 
 ## Example
