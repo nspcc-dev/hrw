@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"reflect"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type (
@@ -68,20 +69,25 @@ func TestSortSliceByIndex(t *testing.T) {
 	expect := []string{"e", "a", "c", "f", "d", "b"}
 	hash := Hash(testKey)
 	SortSliceByIndex(actual, hash)
-	if !reflect.DeepEqual(actual, expect) {
-		t.Errorf("Was %#v, but expected %#v", actual, expect)
-	}
+	require.Equal(t, expect, actual)
+}
+
+func TestValidateWeights(t *testing.T) {
+	weights := []float64{10, 10, 10, 2, 2, 2}
+	err := ValidateWeights(weights)
+	require.Error(t, err)
+	weights = []float64{1, 1, 1, 0.2, 0.2, 0.2}
+	err = ValidateWeights(weights)
+	require.NoError(t, err)
 }
 
 func TestSortSliceByWeightIndex(t *testing.T) {
 	actual := []string{"a", "b", "c", "d", "e", "f"}
-	weights := []uint64{10, 10, 10, 2, 2, 2}
+	weights := []float64{1, 1, 1, 0.2, 0.2, 0.2}
 	expect := []string{"a", "c", "b", "e", "f", "d"}
 	hash := Hash(testKey)
 	SortSliceByWeightIndex(actual, weights, hash)
-	if !reflect.DeepEqual(actual, expect) {
-		t.Errorf("Was %#v, but expected %#v", actual, expect)
-	}
+	require.Equal(t, expect, actual)
 }
 
 func TestSortSliceByValue(t *testing.T) {
@@ -89,9 +95,7 @@ func TestSortSliceByValue(t *testing.T) {
 	expect := []string{"d", "f", "c", "b", "a", "e"}
 	hash := Hash(testKey)
 	SortSliceByValue(actual, hash)
-	if !reflect.DeepEqual(actual, expect) {
-		t.Errorf("Was %#v, but expected %#v", actual, expect)
-	}
+	require.Equal(t, expect, actual)
 }
 
 func TestSortByRule(t *testing.T) {
@@ -106,9 +110,7 @@ func TestSortByRule(t *testing.T) {
 			func(i, j int) { actual[i], actual[j] = actual[j], actual[i] },
 			6, rule)
 
-		if !reflect.DeepEqual(actual, expect) {
-			t.Errorf("Was %#v, but expected %#v", actual, expect)
-		}
+		require.Equal(t, expect, actual)
 	})
 
 	t.Run("inverse", func(t *testing.T) {
@@ -122,9 +124,7 @@ func TestSortByRule(t *testing.T) {
 			func(i, j int) { actual[i], actual[j] = actual[j], actual[i] },
 			6, rule)
 
-		if !reflect.DeepEqual(actual, expect) {
-			t.Errorf("Was %#v, but expected %#v", actual, expect)
-		}
+		require.Equal(t, expect, actual)
 	})
 }
 
@@ -134,13 +134,13 @@ func TestSortSliceByValueFail(t *testing.T) {
 			actual []int
 			hash   = Hash(testKey)
 		)
-		SortSliceByValue(actual, hash)
+		require.NotPanics(t, func() { SortSliceByValue(actual, hash) })
 	})
 
 	t.Run("must be slice", func(t *testing.T) {
 		actual := 10
 		hash := Hash(testKey)
-		SortSliceByValue(actual, hash)
+		require.NotPanics(t, func() { SortSliceByValue(actual, hash) })
 	})
 
 	t.Run("must 'fail' for unknown type", func(t *testing.T) {
@@ -148,9 +148,7 @@ func TestSortSliceByValueFail(t *testing.T) {
 		expect := []unknown{1, 2, 3, 4, 5}
 		hash := Hash(testKey)
 		SortSliceByValue(actual, hash)
-		if !reflect.DeepEqual(actual, expect) {
-			t.Errorf("Was %#v, but expected %#v", actual, expect)
-		}
+		require.Equal(t, expect, actual)
 	})
 }
 
@@ -159,9 +157,7 @@ func TestSortSliceByValueHasher(t *testing.T) {
 	expect := []hashString{"d", "f", "c", "b", "a", "e"}
 	hash := Hash(testKey)
 	SortSliceByValue(actual, hash)
-	if !reflect.DeepEqual(actual, expect) {
-		t.Errorf("Was %#v, but expected %#v", actual, expect)
-	}
+	require.Equal(t, expect, actual)
 }
 
 func TestSortSliceByValueIntSlice(t *testing.T) {
@@ -225,9 +221,7 @@ func TestSortSliceByValueIntSlice(t *testing.T) {
 
 	for _, tc := range cases {
 		SortSliceByValue(tc.actual, hash)
-		if !reflect.DeepEqual(tc.actual, tc.expect) {
-			t.Errorf("Was %#v, but expected %#v", tc.actual, tc.expect)
-		}
+		require.Equal(t, tc.expect, tc.actual)
 	}
 }
 
@@ -236,9 +230,7 @@ func TestSort(t *testing.T) {
 	hash := Hash(testKey)
 	actual := Sort(nodes, hash)
 	expected := []uint64{3, 1, 4, 2, 0}
-	if !reflect.DeepEqual(actual, expected) {
-		t.Errorf("Was %#v, but expected %#v", actual, expected)
-	}
+	require.Equal(t, expected, actual)
 }
 
 func TestDistribution(t *testing.T) {
@@ -276,18 +268,11 @@ func TestDistribution(t *testing.T) {
 		for node, count := range counts {
 			d := mean - float64(count)
 			chi2 += math.Pow(float64(count)-mean, 2) / mean
-			if d > delta || (0-d) > delta {
-				t.Errorf(
-					"Node %d received %d keys, expected %.0f (+/- %.2f)",
-					node, count, mean, delta,
-				)
-			}
+			require.True(t, d < delta && (0-d) < delta,
+				"Node %d received %d keys, expected %.0f (+/- %.2f)", node, count, mean, delta)
 		}
-		if chi2 > chiTable[size-1] {
-			t.Errorf(
-				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
-				chi2, chiTable[size-1])
-		}
+		require.True(t, chi2 < chiTable[size-1],
+			"Chi2 condition for .9 is not met (expected %.2f <= %.2f)", chi2, chiTable[size-1])
 	})
 
 	t.Run("sortByIndex", func(t *testing.T) {
@@ -317,18 +302,11 @@ func TestDistribution(t *testing.T) {
 		for node, count := range counts {
 			d := mean - float64(count)
 			chi2 += math.Pow(float64(count)-mean, 2) / mean
-			if d > delta || (0-d) > delta {
-				t.Errorf(
-					"Node %d received %d keys, expected %.0f (+/- %.2f)",
-					node, count, mean, delta,
-				)
-			}
+			require.True(t, d < delta && (0-d) < delta,
+				"Node %d received %d keys, expected %.0f (+/- %.2f)", node, count, mean, delta)
 		}
-		if chi2 > chiTable[size-1] {
-			t.Errorf(
-				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
-				chi2, chiTable[size-1])
-		}
+		require.True(t, chi2 < chiTable[size-1],
+			"Chi2 condition for .9 is not met (expected %.2f <= %.2f)", chi2, chiTable[size-1])
 	})
 
 	t.Run("sortByValue", func(t *testing.T) {
@@ -357,18 +335,11 @@ func TestDistribution(t *testing.T) {
 		for node, count := range counts {
 			d := mean - float64(count)
 			chi2 += math.Pow(float64(count)-mean, 2) / mean
-			if d > delta || (0-d) > delta {
-				t.Errorf(
-					"Node %d received %d keys, expected %.0f (+/- %.2f)",
-					node, count, mean, delta,
-				)
-			}
+			require.True(t, d < delta && (0-d) < delta,
+				"Node %d received %d keys, expected %.0f (+/- %.2f)", node, count, mean, delta)
 		}
-		if chi2 > chiTable[size-1] {
-			t.Errorf(
-				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
-				chi2, chiTable[size-1])
-		}
+		require.True(t, chi2 < chiTable[size-1],
+			"Chi2 condition for .9 is not met (expected %.2f <= %.2f)", chi2, chiTable[size-1])
 	})
 
 	t.Run("sortByStringValue", func(t *testing.T) {
@@ -397,18 +368,11 @@ func TestDistribution(t *testing.T) {
 		for node, count := range counts {
 			d := mean - float64(count)
 			chi2 += math.Pow(float64(count)-mean, 2) / mean
-			if d > delta || (0-d) > delta {
-				t.Errorf(
-					"Node %s received %d keys, expected %.0f (+/- %.2f)",
-					node, count, mean, delta,
-				)
-			}
+			require.True(t, d < delta && (0-d) < delta,
+				"Node %d received %d keys, expected %.0f (+/- %.2f)", node, count, mean, delta)
 		}
-		if chi2 > chiTable[size-1] {
-			t.Errorf(
-				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
-				chi2, chiTable[size-1])
-		}
+		require.True(t, chi2 < chiTable[size-1],
+			"Chi2 condition for .9 is not met (expected %.2f <= %.2f)", chi2, chiTable[size-1])
 	})
 
 	t.Run("sortByInt32Value", func(t *testing.T) {
@@ -437,31 +401,24 @@ func TestDistribution(t *testing.T) {
 		for node, count := range counts {
 			d := mean - float64(count)
 			chi2 += math.Pow(float64(count)-mean, 2) / mean
-			if d > delta || (0-d) > delta {
-				t.Errorf(
-					"Node %d received %d keys, expected %.0f (+/- %.2f)",
-					node, count, mean, delta,
-				)
-			}
+			require.True(t, d < delta && (0-d) < delta,
+				"Node %d received %d keys, expected %.0f (+/- %.2f)", node, count, mean, delta)
 		}
-		if chi2 > chiTable[size-1] {
-			t.Errorf(
-				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
-				chi2, chiTable[size-1])
-		}
+		require.True(t, chi2 < chiTable[size-1],
+			"Chi2 condition for .9 is not met (expected %.2f <= %.2f)", chi2, chiTable[size-1])
 	})
 
 	t.Run("sortByWeightValue", func(t *testing.T) {
 		var (
 			i            uint64
 			a, b, result [size]int
-			w            [size]uint64
+			w            [size]float64
 			key          = make([]byte, 16)
 		)
 
 		for i = 0; i < size; i++ {
 			a[i] = int(i)
-			w[i] = size - i
+			w[i] = float64(size-i) / float64(size)
 		}
 		for i = 0; i < keys; i++ {
 			copy(b[:], a[:])
@@ -470,24 +427,24 @@ func TestDistribution(t *testing.T) {
 			SortSliceByWeightValue(b[:], w[:], hash)
 			result[b[0]]++
 		}
+
 		for i := 0; i < size-1; i++ {
-			if bool(w[i] > w[i+1]) != bool(result[i] > result[i+1]) {
-				t.Fatalf("result array %v must be corresponded to weights %v", result, w)
-			}
+			require.True(t, bool(w[i] > w[i+1]) == bool(result[i] > result[i+1]),
+				"result array %v must be corresponded to weights %v", result, w)
 		}
 	})
 
-	t.Run("sortByWeightValueShuffledW", func(t *testing.T) {
+	t.Run("sortByWeightValueShuffledWeight", func(t *testing.T) {
 		var (
 			i            uint64
 			a, b, result [size]int
-			w            [size]uint64
+			w            [size]float64
 			key          = make([]byte, 16)
 		)
 
 		for i = 0; i < size; i++ {
 			a[i] = int(i)
-			w[i] = size - i
+			w[i] = float64(size-i) / float64(size)
 		}
 
 		rand.Shuffle(size, func(i, j int) {
@@ -501,17 +458,16 @@ func TestDistribution(t *testing.T) {
 			result[b[0]]++
 		}
 		for i := 0; i < size-1; i++ {
-			if bool(w[i] > w[i+1]) != bool(result[i] > result[i+1]) {
-				t.Fatalf("result array %v must be corresponded to weights %v", result, w)
-			}
+			require.True(t, bool(w[i] > w[i+1]) == bool(result[i] > result[i+1]),
+				"result array %v must be corresponded to weights %v", result, w)
 		}
 	})
 
-	t.Run("sortByWeightValueEmptyW", func(t *testing.T) {
+	t.Run("sortByWeightValueEmptyWeight", func(t *testing.T) {
 		var (
 			i      uint64
 			a, b   [size]int
-			w      [size]uint64
+			w      [size]float64
 			counts = make(map[int]int, size)
 			key    = make([]byte, 16)
 		)
@@ -534,32 +490,25 @@ func TestDistribution(t *testing.T) {
 		for node, count := range counts {
 			d := mean - float64(count)
 			chi2 += math.Pow(float64(count)-mean, 2) / mean
-			if d > delta || (0-d) > delta {
-				t.Errorf(
-					"Node %d received %d keys, expected %.0f (+/- %.2f)",
-					node, count, mean, delta,
-				)
-			}
+			require.True(t, d < delta && (0-d) < delta,
+				"Node %d received %d keys, expected %.0f (+/- %.2f)", node, count, mean, delta)
 		}
-		if chi2 > chiTable[size-1] {
-			t.Errorf(
-				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
-				chi2, chiTable[size-1])
-		}
+		require.True(t, chi2 < chiTable[size-1],
+			"Chi2 condition for .9 is not met (expected %.2f <= %.2f)", chi2, chiTable[size-1])
 	})
 
-	t.Run("sortByWeightValueUniformW", func(t *testing.T) {
+	t.Run("sortByWeightValueUniformWeight", func(t *testing.T) {
 		var (
 			i      uint64
 			a, b   [size]int
-			w      [size]uint64
+			w      [size]float64
 			counts = make(map[int]int, size)
 			key    = make([]byte, 16)
 		)
 
 		for i = 0; i < size; i++ {
 			a[i] = int(i)
-			w[i] = 10
+			w[i] = 0.5
 		}
 
 		for i = 0; i < keys; i++ {
@@ -576,43 +525,83 @@ func TestDistribution(t *testing.T) {
 		for node, count := range counts {
 			d := mean - float64(count)
 			chi2 += math.Pow(float64(count)-mean, 2) / mean
-			if d > delta || (0-d) > delta {
-				t.Errorf(
-					"Node %d received %d keys, expected %.0f (+/- %.2f)",
-					node, count, mean, delta,
-				)
-			}
+			require.True(t, d < delta && (0-d) < delta,
+				"Node %d received %d keys, expected %.0f (+/- %.2f)", node, count, mean, delta)
 		}
-		if chi2 > chiTable[size-1] {
-			t.Errorf(
-				"Chi2 condition for .9 is not met (expected %.2f <= %.2f)",
-				chi2, chiTable[size-1])
-		}
+		require.True(t, chi2 < chiTable[size-1],
+			"Chi2 condition for .9 is not met (expected %.2f <= %.2f)", chi2, chiTable[size-1])
 	})
 
 	t.Run("sortByWeightValueAbsoluteW", func(t *testing.T) {
+		const keys = 1
 		var (
 			i    uint64
 			a, b [size]int
-			w    [size]uint64
+			w    [size]float64
 			key  = make([]byte, 16)
 		)
 
 		for i = 0; i < size; i++ {
 			a[i] = int(i)
 		}
-		w[size-1] = 10
+		w[size-1] = 1
 
 		for i = 0; i < keys; i++ {
 			copy(b[:], a[:])
 			binary.BigEndian.PutUint64(key, i+size)
 			hash := Hash(key)
 			SortSliceByWeightValue(b[:], w[:], hash)
-			if b[0] != a[size-1] {
-				t.Fatalf("expected last value of %v to be the first with highest weight", a)
-			}
+			require.True(t, b[0] == a[size-1],
+				"expected last value of %v to be the first with highest distance", a)
 		}
 
+	})
+
+	t.Run("sortByWeightValueNormalizedWeight", func(t *testing.T) {
+		var (
+			i              uint64
+			a, b, result   [size]uint64
+			w, normalizedW [size]float64
+			key            = make([]byte, 16)
+		)
+
+		for i = 0; i < size; i++ {
+			a[i] = i
+			w[int(i)] = 10
+		}
+		w[0] = 100
+
+		// Here let's use logarithm normalization
+		for i = 0; i < size; i++ {
+			normalizedW[i] = math.Log2(w[i]) / math.Log2(w[0])
+		}
+
+		for i = 0; i < keys; i++ {
+			copy(b[:], a[:])
+			binary.BigEndian.PutUint64(key, i+size)
+			hash := Hash(key)
+			SortSliceByWeightValue(b[:], normalizedW[:], hash)
+			for j := range b {
+				result[b[j]] += uint64(len(b) - j)
+			}
+		}
+		cutResult := result[1:]
+		var total uint64
+		for i := range cutResult {
+			total += cutResult[i]
+		}
+
+		var chi2 float64
+		mean := float64(total) / float64(len(cutResult))
+		delta := mean * percent
+		for node, count := range cutResult {
+			d := mean - float64(count)
+			chi2 += math.Pow(float64(count)-mean, 2) / mean
+			require.True(t, d < delta && (0-d) < delta,
+				"Node %d received %d keys, expected %.0f (+/- %.2f)", node, count, mean, delta)
+		}
+		require.True(t, chi2 < chiTable[size-1],
+			"Chi2 condition for .9 is not met (expected %.2f <= %.2f)", chi2, chiTable[size-1])
 	})
 
 	t.Run("hash collision", func(t *testing.T) {
@@ -772,9 +761,9 @@ func benchmarkSortByValue(b *testing.B, n int, hash uint64) {
 
 func benchmarkSortByWeight(b *testing.B, n int, hash uint64) uint64 {
 	servers := make([]uint64, n)
-	weights := make([]uint64, n)
+	weights := make([]float64, n)
 	for i := uint64(0); i < uint64(len(servers)); i++ {
-		weights[i] = uint64(n) - i
+		weights[i] = float64(uint64(n)-i) / float64(n)
 		servers[i] = i
 	}
 
@@ -790,9 +779,9 @@ func benchmarkSortByWeight(b *testing.B, n int, hash uint64) uint64 {
 
 func benchmarkSortByWeightIndex(b *testing.B, n int, hash uint64) {
 	servers := make([]uint64, n)
-	weights := make([]uint64, n)
+	weights := make([]float64, n)
 	for i := uint64(0); i < uint64(len(servers)); i++ {
-		weights[i] = uint64(n) - i
+		weights[i] = float64(uint64(n)-i) / float64(n)
 		servers[i] = i
 	}
 
@@ -806,9 +795,9 @@ func benchmarkSortByWeightIndex(b *testing.B, n int, hash uint64) {
 
 func benchmarkSortByWeightValue(b *testing.B, n int, hash uint64) {
 	servers := make([]string, n)
-	weights := make([]uint64, n)
+	weights := make([]float64, n)
 	for i := uint64(0); i < uint64(len(servers)); i++ {
-		weights[i] = uint64(n) - i
+		weights[i] = float64(uint64(n)-i) / float64(n)
 		servers[i] = "localhost:" + strconv.FormatUint(60000-i, 10)
 	}
 
