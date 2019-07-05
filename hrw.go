@@ -4,6 +4,7 @@ package hrw
 
 import (
 	"encoding/binary"
+	"errors"
 	"reflect"
 	"sort"
 
@@ -17,9 +18,9 @@ type (
 	Hasher interface{ Hash() uint64 }
 
 	hashed struct {
-		length int
-		sorted []uint64
-		weight []uint64
+		length   int
+		sorted   []uint64
+		distance []uint64
 	}
 
 	weighted struct {
@@ -28,7 +29,13 @@ type (
 	}
 )
 
-func weight(x uint64, y uint64) uint64 {
+// Boundaries of valid normalized weights
+const (
+	NormalizedMaxWeight = 1.0
+	NormalizedMinWeight = 0.0
+)
+
+func distance(x uint64, y uint64) uint64 {
 	acc := x ^ y
 	// here used mmh3 64 bit finalizer
 	// https://github.com/aappleby/smhasher/blob/61a0530f28277f2e850bfc39600ce61d02b518de/src/MurmurHash3.cpp#L81
@@ -41,19 +48,19 @@ func weight(x uint64, y uint64) uint64 {
 }
 
 func (h hashed) Len() int           { return h.length }
-func (h hashed) Less(i, j int) bool { return h.weight[i] < h.weight[j] }
+func (h hashed) Less(i, j int) bool { return h.distance[i] < h.distance[j] }
 func (h hashed) Swap(i, j int) {
 	h.sorted[i], h.sorted[j] = h.sorted[j], h.sorted[i]
-	h.weight[i], h.weight[j] = h.weight[j], h.weight[i]
+	h.distance[i], h.distance[j] = h.distance[j], h.distance[i]
 }
 
 func (w weighted) Len() int { return w.h.length }
 func (w weighted) Less(i, j int) bool {
-	// `maxUint64 - weight` makes least weight most valuable
+	// `maxUint64 - distance` makes the shorter distance more valuable
 	// it is necessary for operation with normalized values
-	wi := float64(^uint64(0)-w.h.weight[i]) * w.normal[i]
-	wj := float64(^uint64(0)-w.h.weight[j]) * w.normal[j]
-	return wi > wj // higher weight must be placed lower to be first
+	wi := float64(^uint64(0)-w.h.distance[i]) * w.normal[i]
+	wj := float64(^uint64(0)-w.h.distance[j]) * w.normal[j]
+	return wi > wj // higher distance must be placed lower to be first
 }
 func (w weighted) Swap(i, j int) { w.normal[i], w.normal[j] = w.normal[j], w.normal[i]; w.h.Swap(i, j) }
 
@@ -62,65 +69,64 @@ func Hash(key []byte) uint64 {
 	return murmur3.Sum64(key)
 }
 
-// Sort receive nodes and hash, and sort it by weight
+// Sort receive nodes and hash, and sort it by distance
 func Sort(nodes []uint64, hash uint64) []uint64 {
 	var (
 		l = len(nodes)
 		h = hashed{
-			length: l,
-			sorted: make([]uint64, 0, l),
-			weight: make([]uint64, 0, l),
+			length:   l,
+			sorted:   make([]uint64, 0, l),
+			distance: make([]uint64, 0, l),
 		}
 	)
 
-	for i, node := range nodes {
+	for i := range nodes {
 		h.sorted = append(h.sorted, uint64(i))
-		h.weight = append(h.weight, weight(node, hash))
+		h.distance = append(h.distance, distance(nodes[i], hash))
 	}
 
 	sort.Sort(h)
 	return h.sorted
 }
 
-// SortByWeight receive nodes and hash, and sort it by weight
-func SortByWeight(nodes []uint64, weights []uint64, hash uint64) []uint64 {
-	var (
-		maxWeight uint64
-
-		l = len(nodes)
-		w = weighted{
-			h: hashed{
-				length: l,
-				sorted: make([]uint64, 0, l),
-				weight: make([]uint64, 0, l),
-			},
-			normal: make([]float64, 0, l),
-		}
-	)
-
-	// finding max weight to perform normalization
+// SortByWeight receive nodes, weights and hash, and sort it by distance * weight
+func SortByWeight(nodes []uint64, weights []float64, hash uint64) []uint64 {
+	// check if numbers of weights and nodes are equal
+	uniform := true
 	for i := range weights {
-		if maxWeight < weights[i] {
-			maxWeight = weights[i]
+		// check if all nodes have the same distance
+		if weights[i] != weights[0] {
+			uniform = false
+			break
 		}
 	}
 
-	// if all nodes have 0-weights or weights are incorrect then sort uniformly
-	if maxWeight == 0 || l != len(nodes) {
+	l := len(nodes)
+	w := weighted{
+		h: hashed{
+			length:   l,
+			sorted:   make([]uint64, 0, l),
+			distance: make([]uint64, 0, l),
+		},
+		normal: make([]float64, l),
+	}
+
+	// if all nodes have the same distance then sort uniformly
+	if uniform || len(weights) != l {
 		return Sort(nodes, hash)
 	}
 
-	fMaxWeight := float64(maxWeight)
-	for i, node := range nodes {
+	for i := range nodes {
 		w.h.sorted = append(w.h.sorted, uint64(i))
-		w.h.weight = append(w.h.weight, weight(node, hash))
-		w.normal = append(w.normal, float64(weights[i])/fMaxWeight)
+		w.h.distance = append(w.h.distance, distance(nodes[i], hash))
 	}
+	copy(w.normal, weights)
+
 	sort.Sort(w)
 	return w.h.sorted
 }
 
-// SortSliceByValue received []T and hash to sort by value-weight
+// SortSliceByValue received []T and hash to sort by value-distance
 func SortSliceByValue(slice interface{}, hash uint64) {
 	rule := prepareRule(slice)
 	if rule != nil {
@@ -130,17 +136,17 @@ func SortSliceByValue(slice interface{}, hash uint64) {
 	}
 }
 
-// SortSliceByWeightValue received []T, weights and hash to sort by value-weight
-func SortSliceByWeightValue(slice interface{}, weight []uint64, hash uint64) {
+// SortSliceByWeightValue received []T, weights and hash to sort by value-distance * weights
+func SortSliceByWeightValue(slice interface{}, weights []float64, hash uint64) {
 	rule := prepareRule(slice)
 	if rule != nil {
 		swap := reflect.Swapper(slice)
-		rule = SortByWeight(rule, weight, hash)
+		rule = SortByWeight(rule, weights, hash)
 		sortByRuleInverse(swap, uint64(len(rule)), rule)
 	}
 }
 
-// SortSliceByIndex received []T and hash to sort by index-weight
+// SortSliceByIndex received []T and hash to sort by index-distance
 func SortSliceByIndex(slice interface{}, hash uint64) {
 	length := uint64(reflect.ValueOf(slice).Len())
 	swap := reflect.Swapper(slice)
@@ -152,15 +158,15 @@ func SortSliceByIndex(slice interface{}, hash uint64) {
 	sortByRuleInverse(swap, length, rule)
 }
 
-// SortSliceByWeightIndex received []T, weights and hash to sort by index-weight
-func SortSliceByWeightIndex(slice interface{}, weight []uint64, hash uint64) {
+// SortSliceByWeightIndex received []T, weights and hash to sort by index-distance * weights
+func SortSliceByWeightIndex(slice interface{}, weights []float64, hash uint64) {
 	length := uint64(reflect.ValueOf(slice).Len())
 	swap := reflect.Swapper(slice)
 	rule := make([]uint64, 0, length)
 	for i := uint64(0); i < length; i++ {
 		rule = append(rule, i)
 	}
-	rule = SortByWeight(rule, weight, hash)
+	rule = SortByWeight(rule, weights, hash)
 	sortByRuleInverse(swap, length, rule)
 }
 
@@ -282,4 +288,14 @@ func prepareRule(slice interface{}) []uint64 {
 		}
 	}
 	return rule
+}
+
+// ValidateWeights checks if weights are normalized between 0.0 and 1.0
+func ValidateWeights(weights []float64) error {
+	for i := range weights {
+		if weights[i] > NormalizedMaxWeight || weights[i] < NormalizedMinWeight {
+			return errors.New("weights are not normalized")
+		}
+	}
+	return nil
 }
