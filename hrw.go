@@ -5,6 +5,7 @@ package hrw
 import (
 	"encoding/binary"
 	"errors"
+	"math"
 	"reflect"
 	"sort"
 
@@ -293,7 +294,7 @@ func prepareRule(slice interface{}) []uint64 {
 // ValidateWeights checks if weights are normalized between 0.0 and 1.0
 func ValidateWeights(weights []float64) error {
 	for i := range weights {
-		if weights[i] > NormalizedMaxWeight || weights[i] < NormalizedMinWeight {
+		if math.IsNaN(weights[i]) || weights[i] > NormalizedMaxWeight || weights[i] < NormalizedMinWeight {
 			return errors.New("weights are not normalized")
 		}
 	}
