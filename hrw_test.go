@@ -76,6 +76,9 @@ func TestValidateWeights(t *testing.T) {
 	weights := []float64{10, 10, 10, 2, 2, 2}
 	err := ValidateWeights(weights)
 	require.Error(t, err)
+	weights = []float64{math.NaN(), 1, 1, 0.2, 0.2, 0.2}
+	err = ValidateWeights(weights)
+	require.Error(t, err)
 	weights = []float64{1, 1, 1, 0.2, 0.2, 0.2}
 	err = ValidateWeights(weights)
 	require.NoError(t, err)
