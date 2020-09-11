@@ -13,20 +13,13 @@ import (
 )
 
 type (
-	swapper func(i, j int)
-
 	// Hasher interface used by SortSliceByValue
 	Hasher interface{ Hash() uint64 }
 
-	hashed struct {
-		length   int
-		sorted   []uint64
-		distance []uint64
-	}
-
-	weighted struct {
-		h      hashed
-		normal []float64 // normalized input weights
+	sorter struct {
+		l    int
+		less func(i, j int) bool
+		swap func(i, j int)
 	}
 )
 
@@ -35,6 +28,10 @@ const (
 	NormalizedMaxWeight = 1.0
 	NormalizedMinWeight = 0.0
 )
+
+func (s *sorter) Len() int           { return s.l }
+func (s *sorter) Less(i, j int) bool { return s.less(i, j) }
+func (s *sorter) Swap(i, j int)      { s.swap(i, j) }
 
 func distance(x uint64, y uint64) uint64 {
 	acc := x ^ y
@@ -48,23 +45,6 @@ func distance(x uint64, y uint64) uint64 {
 	return acc
 }
 
-func (h hashed) Len() int           { return h.length }
-func (h hashed) Less(i, j int) bool { return h.distance[i] < h.distance[j] }
-func (h hashed) Swap(i, j int) {
-	h.sorted[i], h.sorted[j] = h.sorted[j], h.sorted[i]
-	h.distance[i], h.distance[j] = h.distance[j], h.distance[i]
-}
-
-func (w weighted) Len() int { return w.h.length }
-func (w weighted) Less(i, j int) bool {
-	// `maxUint64 - distance` makes the shorter distance more valuable
-	// it is necessary for operation with normalized values
-	wi := float64(^uint64(0)-w.h.distance[i]) * w.normal[i]
-	wj := float64(^uint64(0)-w.h.distance[j]) * w.normal[j]
-	return wi > wj // higher distance must be placed lower to be first
-}
-func (w weighted) Swap(i, j int) { w.normal[i], w.normal[j] = w.normal[j], w.normal[i]; w.h.Swap(i, j) }
-
 // Hash uses murmur3 hash to return uint64
 func Hash(key []byte) uint64 {
 	return murmur3.Sum64(key)
@@ -72,59 +52,26 @@ func Hash(key []byte) uint64 {
 
 // Sort receive nodes and hash, and sort it by distance
 func Sort(nodes []uint64, hash uint64) []uint64 {
-	var (
-		l = len(nodes)
-		h = hashed{
-			length:   l,
-			sorted:   make([]uint64, 0, l),
-			distance: make([]uint64, 0, l),
-		}
-	)
-
+	l := len(nodes)
+	sorted := make([]uint64, l)
+	dist := make([]uint64, l)
 	for i := range nodes {
-		h.sorted = append(h.sorted, uint64(i))
-		h.distance = append(h.distance, distance(nodes[i], hash))
+		sorted[i] = uint64(i)
+		dist[i] = distance(nodes[i], hash)
 	}
 
-	sort.Sort(h)
-	return h.sorted
+	sort.Slice(sorted, func(i, j int) bool {
+		return dist[sorted[i]] < dist[sorted[j]]
+	})
+	return sorted
 }
 
 // SortByWeight receive nodes, weights and hash, and sort it by distance * weight
 func SortByWeight(nodes []uint64, weights []float64, hash uint64) []uint64 {
-	// check if numbers of weights and nodes are equal
-	uniform := true
-	for i := range weights {
-		// check if all nodes have the same distance
-		if weights[i] != weights[0] {
-			uniform = false
-			break
-		}
-	}
-
-	l := len(nodes)
-	w := weighted{
-		h: hashed{
-			length:   l,
-			sorted:   make([]uint64, 0, l),
-			distance: make([]uint64, 0, l),
-		},
-		normal: make([]float64, l),
-	}
-
-	// if all nodes have the same distance then sort uniformly
-	if uniform || len(weights) != l {
-		return Sort(nodes, hash)
-	}
-
-	for i := range nodes {
-		w.h.sorted = append(w.h.sorted, uint64(i))
-		w.h.distance = append(w.h.distance, distance(nodes[i], hash))
-	}
-	copy(w.normal, weights)
-
-	sort.Sort(w)
-	return w.h.sorted
+	result := make([]uint64, len(nodes))
+	copy(nodes, result)
+	sortByWeight(len(nodes), false, nodes, weights, hash, reflect.Swapper(result))
+	return result
 }
 
 // SortSliceByValue received []T and hash to sort by value-distance
@@ -132,8 +79,7 @@ func SortSliceByValue(slice interface{}, hash uint64) {
 	rule := prepareRule(slice)
 	if rule != nil {
 		swap := reflect.Swapper(slice)
-		rule = Sort(rule, hash)
-		sortByRuleInverse(swap, uint64(len(rule)), rule)
+		sortByDistance(len(rule), false, rule, hash, swap)
 	}
 }
 
@@ -142,60 +88,22 @@ func SortSliceByWeightValue(slice interface{}, weights []float64, hash uint64) {
 	rule := prepareRule(slice)
 	if rule != nil {
 		swap := reflect.Swapper(slice)
-		rule = SortByWeight(rule, weights, hash)
-		sortByRuleInverse(swap, uint64(len(rule)), rule)
+		sortByWeight(reflect.ValueOf(slice).Len(), false, rule, weights, hash, swap)
 	}
 }
 
 // SortSliceByIndex received []T and hash to sort by index-distance
 func SortSliceByIndex(slice interface{}, hash uint64) {
-	length := uint64(reflect.ValueOf(slice).Len())
+	length := reflect.ValueOf(slice).Len()
 	swap := reflect.Swapper(slice)
-	rule := make([]uint64, 0, length)
-	for i := uint64(0); i < length; i++ {
-		rule = append(rule, i)
-	}
-	rule = Sort(rule, hash)
-	sortByRuleInverse(swap, length, rule)
+	sortByDistance(length, true, nil, hash, swap)
 }
 
 // SortSliceByWeightIndex received []T, weights and hash to sort by index-distance * weights
 func SortSliceByWeightIndex(slice interface{}, weights []float64, hash uint64) {
-	length := uint64(reflect.ValueOf(slice).Len())
+	length := reflect.ValueOf(slice).Len()
 	swap := reflect.Swapper(slice)
-	rule := make([]uint64, 0, length)
-	for i := uint64(0); i < length; i++ {
-		rule = append(rule, i)
-	}
-	rule = SortByWeight(rule, weights, hash)
-	sortByRuleInverse(swap, length, rule)
-}
-
-func sortByRuleDirect(swap swapper, length uint64, rule []uint64) {
-	done := make([]bool, length)
-	for i := uint64(0); i < length; i++ {
-		if done[i] {
-			continue
-		}
-		for j := rule[i]; !done[rule[j]]; j = rule[j] {
-			swap(int(i), int(j))
-			done[j] = true
-		}
-	}
-}
-
-func sortByRuleInverse(swap swapper, length uint64, rule []uint64) {
-	done := make([]bool, length)
-	for i := uint64(0); i < length; i++ {
-		if done[i] {
-			continue
-		}
-
-		for j := i; !done[rule[j]]; j = rule[j] {
-			swap(int(j), int(rule[j]))
-			done[j] = true
-		}
-	}
+	sortByWeight(length, true, nil, weights, hash, swap)
 }
 
 func prepareRule(slice interface{}) []uint64 {
@@ -299,4 +207,78 @@ func ValidateWeights(weights []float64) error {
 		}
 	}
 	return nil
+}
+
+func newSorter(l int, byIndex bool, nodes []uint64, h uint64,
+	swap func(i, j int)) (*sorter, []int, []uint64) {
+	ind := make([]int, l)
+	dist := make([]uint64, l)
+	for i := 0; i < l; i++ {
+		ind[i] = i
+		dist[i] = getDistance(byIndex, i, nodes, h)
+	}
+
+	return &sorter{
+		l: l,
+		swap: func(i, j int) {
+			swap(i, j)
+			ind[i], ind[j] = ind[j], ind[i]
+		},
+	}, ind, dist
+}
+
+// sortByWeight sorts nodes by weight using provided swapper.
+// nodes contains hrw hashes. If it is nil, indices are used.
+func sortByWeight(l int, byIndex bool, nodes []uint64, weights []float64, hash uint64, swap func(i, j int)) {
+	// if all nodes have the same distance then sort uniformly
+	if allSameF64(weights) {
+		sortByDistance(l, byIndex, nodes, hash, swap)
+		return
+	}
+
+	s, ind, dist := newSorter(l, byIndex, nodes, hash, swap)
+	s.less = func(i, j int) bool {
+		ii, jj := ind[i], ind[j]
+		// `maxUint64 - distance` makes the shorter distance more valuable
+		// it is necessary for operation with normalized values
+		wi := float64(^uint64(0)-dist[ii]) * weights[ii]
+		wj := float64(^uint64(0)-dist[jj]) * weights[jj]
+		return wi > wj // higher distance must be placed lower to be first
+	}
+	sort.Sort(s)
+}
+
+// sortByDistance sorts nodes by hrw distance using provided swapper.
+// nodes contains hrw hashes. If it is nil, indices are used.
+func sortByDistance(l int, byIndex bool, nodes []uint64, hash uint64, swap func(i, j int)) {
+	s, ind, dist := newSorter(l, byIndex, nodes, hash, swap)
+	s.less = func(i, j int) bool {
+		return dist[ind[i]] < dist[ind[j]]
+	}
+	sort.Sort(s)
+}
+
+// getDistance return distance from nodes[i] to h.
+// If byIndex is true, nodes index is used.
+// Else if nodes[i] != nil, distance is calculated from this value.
+// Otherwise, and hash from node index is taken.
+func getDistance(byIndex bool, i int, nodes []uint64, h uint64) uint64 {
+	if nodes != nil {
+		return distance(nodes[i], h)
+	} else if byIndex {
+		return distance(uint64(i), h)
+	} else {
+		buf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(buf, uint64(i))
+		return distance(Hash(buf), h)
+	}
+}
+
+func allSameF64(fs []float64) bool {
+	for i := range fs {
+		if fs[i] != fs[0] {
+			return false
+		}
+	}
+	return true
 }
