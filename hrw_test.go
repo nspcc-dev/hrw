@@ -101,36 +101,6 @@ func TestSortSliceByValue(t *testing.T) {
 	require.Equal(t, expect, actual)
 }
 
-func TestSortByRule(t *testing.T) {
-	t.Run("direct", func(t *testing.T) {
-		//                  0    1    2    3    4    5
-		actual := []string{"a", "b", "c", "d", "e", "f"}
-		//                  4    2    0    5    3    1
-		expect := []string{"c", "f", "b", "e", "a", "d"}
-		rule := []uint64{4, 2, 0, 5, 3, 1}
-
-		sortByRuleDirect(
-			func(i, j int) { actual[i], actual[j] = actual[j], actual[i] },
-			6, rule)
-
-		require.Equal(t, expect, actual)
-	})
-
-	t.Run("inverse", func(t *testing.T) {
-		//                  0    1    2    3    4    5
-		actual := []string{"a", "b", "c", "d", "e", "f"}
-		//                  4    2    0    5    3    1
-		expect := []string{"e", "c", "a", "f", "d", "b"}
-		rule := []uint64{4, 2, 0, 5, 3, 1}
-
-		sortByRuleInverse(
-			func(i, j int) { actual[i], actual[j] = actual[j], actual[i] },
-			6, rule)
-
-		require.Equal(t, expect, actual)
-	})
-}
-
 func TestSortSliceByValueFail(t *testing.T) {
 	t.Run("empty slice", func(t *testing.T) {
 		var (
