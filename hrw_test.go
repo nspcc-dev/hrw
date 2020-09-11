@@ -236,16 +236,17 @@ func TestSort(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
+// We use χ2 method to determine similarity of distribution with uniform distribution.
+// χ2 = Σ((n-N)**2/N)
+// https://www.medcalc.org/manual/chi-square-table.php p=0.1
+var chiTable = map[int]float64{9: 14.68, 99: 117.407}
+
 func TestDistribution(t *testing.T) {
 	const (
 		size    = 10
 		keys    = 100000
 		percent = 0.03
 	)
-	// We use χ2 method to determine similarity of distribution with uniform distribution.
-	// χ2 = Σ((n-N)**2/N)
-	// https://www.medcalc.org/manual/chi-square-table.php p=0.1
-	var chiTable = map[int]float64{9: 14.68, 99: 117.407}
 
 	t.Run("sort", func(t *testing.T) {
 		var (
