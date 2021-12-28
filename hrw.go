@@ -109,7 +109,7 @@ func SortSliceByWeightIndex(slice interface{}, weights []float64, hash uint64) {
 func prepareRule(slice interface{}) []uint64 {
 	t := reflect.TypeOf(slice)
 	if t.Kind() != reflect.Slice {
-		return nil
+		panic("HRW sort expects slice, got " + t.Kind().String())
 	}
 
 	var (
@@ -188,7 +188,7 @@ func prepareRule(slice interface{}) []uint64 {
 
 	default:
 		if _, ok := val.Index(0).Interface().(Hasher); !ok {
-			return nil
+			panic("slice elements must implement hrw.Hasher")
 		}
 
 		for i := 0; i < length; i++ {

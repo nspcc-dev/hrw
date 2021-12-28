@@ -113,15 +113,13 @@ func TestSortSliceByValueFail(t *testing.T) {
 	t.Run("must be slice", func(t *testing.T) {
 		actual := 10
 		hash := Hash(testKey)
-		require.NotPanics(t, func() { SortSliceByValue(actual, hash) })
+		require.Panics(t, func() { SortSliceByValue(actual, hash) })
 	})
 
 	t.Run("must 'fail' for unknown type", func(t *testing.T) {
 		actual := []unknown{1, 2, 3, 4, 5}
-		expect := []unknown{1, 2, 3, 4, 5}
 		hash := Hash(testKey)
-		SortSliceByValue(actual, hash)
-		require.Equal(t, expect, actual)
+		require.Panics(t, func() { SortSliceByValue(actual, hash) })
 	})
 }
 
@@ -173,11 +171,6 @@ func TestSortSliceByValueIntSlice(t *testing.T) {
 		{
 			actual: []uint32{0, 1, 2, 3, 4, 5},
 			expect: []uint32{5, 1, 2, 0, 3, 4},
-		},
-
-		{
-			actual: Uint32Slice{0, 1, 2, 3, 4, 5},
-			expect: Uint32Slice{0, 1, 2, 3, 4, 5},
 		},
 
 		{
