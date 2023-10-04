@@ -9,11 +9,11 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/spaolacci/murmur3"
+	"github.com/twmb/murmur3"
 )
 
 type (
-	// Hasher interface used by SortSliceByValue
+	// Hasher interface used by SortSliceByValue.
 	Hasher interface{ Hash() uint64 }
 
 	sorter struct {
@@ -23,7 +23,7 @@ type (
 	}
 )
 
-// Boundaries of valid normalized weights
+// Boundaries of valid normalized weights.
 const (
 	NormalizedMaxWeight = 1.0
 	NormalizedMinWeight = 0.0
@@ -45,12 +45,12 @@ func distance(x uint64, y uint64) uint64 {
 	return acc
 }
 
-// Hash uses murmur3 hash to return uint64
+// Hash uses murmur3 hash to return uint64.
 func Hash(key []byte) uint64 {
 	return murmur3.Sum64(key)
 }
 
-// Sort receive nodes and hash, and sort it by distance
+// Sort receive nodes and hash, and sort it by distance.
 func Sort(nodes []uint64, hash uint64) []uint64 {
 	l := len(nodes)
 	sorted := make([]uint64, l)
@@ -66,7 +66,7 @@ func Sort(nodes []uint64, hash uint64) []uint64 {
 	return sorted
 }
 
-// SortByWeight receive nodes, weights and hash, and sort it by distance * weight
+// SortByWeight receive nodes, weights and hash, and sort it by distance * weight.
 func SortByWeight(nodes []uint64, weights []float64, hash uint64) []uint64 {
 	result := make([]uint64, len(nodes))
 	copy(nodes, result)
@@ -74,7 +74,7 @@ func SortByWeight(nodes []uint64, weights []float64, hash uint64) []uint64 {
 	return result
 }
 
-// SortSliceByValue received []T and hash to sort by value-distance
+// SortSliceByValue received []T and hash to sort by value-distance.
 func SortSliceByValue(slice interface{}, hash uint64) {
 	rule := prepareRule(slice)
 	if rule != nil {
@@ -83,7 +83,7 @@ func SortSliceByValue(slice interface{}, hash uint64) {
 	}
 }
 
-// SortSliceByWeightValue received []T, weights and hash to sort by value-distance * weights
+// SortSliceByWeightValue received []T, weights and hash to sort by value-distance * weights.
 func SortSliceByWeightValue(slice interface{}, weights []float64, hash uint64) {
 	rule := prepareRule(slice)
 	if rule != nil {
@@ -92,14 +92,14 @@ func SortSliceByWeightValue(slice interface{}, weights []float64, hash uint64) {
 	}
 }
 
-// SortSliceByIndex received []T and hash to sort by index-distance
+// SortSliceByIndex received []T and hash to sort by index-distance.
 func SortSliceByIndex(slice interface{}, hash uint64) {
 	length := reflect.ValueOf(slice).Len()
 	swap := reflect.Swapper(slice)
 	sortByDistance(length, true, nil, hash, swap)
 }
 
-// SortSliceByWeightIndex received []T, weights and hash to sort by index-distance * weights
+// SortSliceByWeightIndex received []T, weights and hash to sort by index-distance * weights.
 func SortSliceByWeightIndex(slice interface{}, weights []float64, hash uint64) {
 	length := reflect.ValueOf(slice).Len()
 	swap := reflect.Swapper(slice)
@@ -199,7 +199,7 @@ func prepareRule(slice interface{}) []uint64 {
 	return rule
 }
 
-// ValidateWeights checks if weights are normalized between 0.0 and 1.0
+// ValidateWeights checks if weights are normalized between 0.0 and 1.0.
 func ValidateWeights(weights []float64) error {
 	for i := range weights {
 		if math.IsNaN(weights[i]) || weights[i] > NormalizedMaxWeight || weights[i] < NormalizedMinWeight {

@@ -1,6 +1,5 @@
 # Golang HRW implementation
 
-[![Build Status](https://travis-ci.org/nspcc-dev/hrw.svg?branch=master)](https://travis-ci.org/nspcc-dev/hrw)
 [![codecov](https://codecov.io/gh/nspcc-dev/hrw/badge.svg)](https://codecov.io/gh/nspcc-dev/hrw)
 [![Report](https://goreportcard.com/badge/github.com/nspcc-dev/hrw)](https://goreportcard.com/report/github.com/nspcc-dev/hrw)
 [![GitHub release](https://img.shields.io/github/release/nspcc-dev/hrw.svg)](https://github.com/nspcc-dev/hrw)
