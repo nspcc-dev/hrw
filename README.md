@@ -8,7 +8,7 @@
 
 ## Install
 
-`go get github.com/nspcc-dev/hrw`
+`go get github.com/nspcc-dev/hrw/v2`
 
 ## Benchmark:
 
@@ -42,30 +42,33 @@ package main
 import (
 	"fmt"
 	
-	"github.com/nspcc-dev/hrw"
+	"github.com/nspcc-dev/hrw/v2"
 )
+
+type hashString string
+
+func (h hashString) Hash() uint64 {
+	return hrw.WrapBytes([]byte(h)).Hash()
+}
 
 func main() {
 	// given a set of servers
-	servers := []string{
-		"one.example.com",
-		"two.example.com",
-		"three.example.com",
-		"four.example.com",
-		"five.example.com",
-		"six.example.com",
+	servers := []hrw.Hashable{
+		hashString("one.example.com"),
+		hashString("two.example.com"),
+		hashString("three.example.com"),
+		hashString("four.example.com"),
+		hashString("five.example.com"),
+		hashString("six.example.com"),
 	}
 
 	// HRW can consistently select a uniformly-distributed set of servers for
 	// any given key
-	var (
-		key = []byte("/examples/object-key")
-		h   = hrw.Hash(key)
-	)
+	var key = []byte("/examples/object-key")
 
-	hrw.SortSliceByValue(servers, h)
+	hrw.Sort(servers, hrw.WrapBytes(key))
 	for id := range servers {
-		fmt.Printf("trying GET %s%s\n", servers[id], key)
+		fmt.Printf("trying GET %s%s\n", servers[id], string(key))
 	}
 
 	// Output:
