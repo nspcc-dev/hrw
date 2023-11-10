@@ -1,4 +1,4 @@
-module github.com/nspcc-dev/hrw
+module github.com/nspcc-dev/hrw/v2
 
 go 1.19
 

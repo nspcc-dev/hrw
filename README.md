@@ -8,7 +8,7 @@
 
 ## Install
 
-`go get github.com/nspcc-dev/hrw`
+`go get github.com/nspcc-dev/hrw/v2`
 
 ## Benchmark:
 
@@ -42,7 +42,7 @@ package main
 import (
 	"fmt"
 	
-	"github.com/nspcc-dev/hrw"
+	"github.com/nspcc-dev/hrw/v2"
 )
 
 type hashString string
