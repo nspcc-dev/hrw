@@ -9,6 +9,13 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+// Hash hashes the data in a fashion similar to the
+// [Hashable] interface. Can be used as a hash function
+// required for the HRW hashing algorithm.
+func Hash(data []byte) uint64 {
+	return murmur3.Sum64(data)
+}
+
 // Hashable is something that can be hashed.
 type Hashable interface{ Hash() uint64 }
 
