@@ -2,6 +2,8 @@ module github.com/nspcc-dev/hrw/v2
 
 go 1.20
 
+go 1.14
+
 require (
 	github.com/stretchr/testify v1.8.4
 	github.com/twmb/murmur3 v1.1.8
