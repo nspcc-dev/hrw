@@ -88,11 +88,11 @@ func TestDistribution(t *testing.T) {
 			key    = make([]byte, 16)
 		)
 
-		for i = 0; i < size; i++ {
+		for i = range size {
 			nodes[i] = i
 		}
 
-		for i = 0; i < keys; i++ {
+		for i = range keys {
 			binary.BigEndian.PutUint64(key, i+size)
 			nodesHashed := wrapUint64(nodes[:])
 			Sort(nodesHashed, WrapBytes(key))
@@ -119,7 +119,7 @@ func TestDistribution(t *testing.T) {
 			key    = make([]byte, 16)
 		)
 
-		for i = 0; i < keys; i++ {
+		for i = range keys {
 			binary.BigEndian.PutUint64(key, i+size)
 			hash := WrapBytes(key).Hash()
 			counts[hash]++
