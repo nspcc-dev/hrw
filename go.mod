@@ -3,7 +3,7 @@ module github.com/nspcc-dev/hrw/v2
 go 1.24
 
 require (
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.1
 	github.com/twmb/murmur3 v1.1.8
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
 )
