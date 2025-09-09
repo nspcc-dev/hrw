@@ -34,11 +34,10 @@ func benchmarkSort(b *testing.B, n int, object []byte) uint64 {
 
 	oHash := hashableUint64(WrapBytes(object).Hash())
 
-	b.ResetTimer()
 	b.ReportAllocs()
 
 	var x uint64
-	for range b.N {
+	for b.Loop() {
 		Sort(servers, oHash)
 		x += servers[0].Hash()
 	}
@@ -55,11 +54,10 @@ func benchmarkSortByWeight(b *testing.B, n int, object []byte) uint64 {
 
 	oHash := hashableUint64(WrapBytes(object).Hash())
 
-	b.ResetTimer()
 	b.ReportAllocs()
 
 	var x uint64
-	for range b.N {
+	for b.Loop() {
 		SortWeighted(servers, weights, oHash)
 		x += servers[0].Hash()
 	}

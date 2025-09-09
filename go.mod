@@ -1,11 +1,11 @@
 module github.com/nspcc-dev/hrw/v2
 
-go 1.22
+go 1.24.0
 
 require (
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.1
 	github.com/twmb/murmur3 v1.1.8
-	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
+	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b
 )
 
 require (
